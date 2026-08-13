@@ -55,8 +55,16 @@ async function getSession() {
 function bitmapToTensor(bitmap) {
   // Step 1: shortest-side resize to RESIZE_SIZE.
   const w0 = bitmap.width, h0 = bitmap.height;
+  // Defensive: a tiny / corrupt / not-yet-decoded bitmap can report zero
+  // dimensions, which would give Math.min(0,0)=0 and 256/0=Infinity. The
+  // OffscreenCanvas constructor rejects NaN/Infinity/0 widths.
+  if (!Number.isFinite(w0) || !Number.isFinite(h0) || w0 < 1 || h0 < 1) {
+    throw new Error(`invalid bitmap dimensions: ${w0}x${h0}`);
+  }
   const scale = RESIZE_SIZE / Math.min(w0, h0);
-  const w1 = Math.round(w0 * scale), h1 = Math.round(h0 * scale);
+  // Math.round can still produce 0 if the source is degenerate.
+  const w1 = Math.max(1, Math.round(w0 * scale));
+  const h1 = Math.max(1, Math.round(h0 * scale));
   // Step 2: center-crop INPUT_SIZE.
   const tmp = new OffscreenCanvas(w1, h1);
   const tctx = tmp.getContext('2d', { willReadFrequently: true });
