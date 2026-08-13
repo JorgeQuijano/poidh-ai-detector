@@ -3,7 +3,7 @@ Loading model...
   output: logits [1, 2]
 {
   "n": 100,
-  "elapsed_s": 50.7,
+  "elapsed_s": 51.8,
   "threshold": 0.65,
   "confusion_matrix": {
     "ai": {
