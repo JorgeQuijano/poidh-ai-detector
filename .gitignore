@@ -29,9 +29,12 @@ extension/models/*.pth
 extension/models/*.safetensors
 
 # --- Vendored onnxruntime-web -----------------------------------------------
-# We commit the JS shim + JS loaders (small, ~430KB total) but NOT the WASM
-# binaries (large, ~40MB). The CI fetches the WASM binaries via
-# scripts/fetch-model.sh before running the eval.
+# We commit ort.min.js (small, ~360KB) so a fresh clone can load the extension
+# immediately. The WASM binaries (large, ~40MB total) are gitignored — CI / new
+# developer fetches them via scripts/fetch-model.sh.
+#
+# If we ever want to keep the WASM binaries in tree, do it via git-lfs, not
+# raw blobs. The .jsep.wasm alone is 27MB which would explode clone size.
 extension/vendor/*.wasm
 extension/vendor/*.mjs
 !extension/vendor/.gitkeep
