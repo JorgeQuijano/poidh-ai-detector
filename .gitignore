@@ -1,0 +1,53 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build / test artifacts
+dist/
+coverage/
+*.log
+
+# --- Models (large — track separately or via git-lfs) -----------------------
+# The neural model file is gitignored. Each developer's scripts/fetch-model.sh
+# downloads it on demand.
+extension/models/*.onnx
+extension/models/*.ort
+extension/models/*.bin
+extension/models/*.pt
+extension/models/*.pth
+extension/models/*.safetensors
+
+# --- Vendored onnxruntime-web -----------------------------------------------
+# We commit the JS shim + JS loaders (small, ~430KB total) but NOT the WASM
+# binaries (large, ~40MB). The CI fetches the WASM binaries via
+# scripts/fetch-model.sh before running the eval.
+extension/vendor/*.wasm
+extension/vendor/*.mjs
+!extension/vendor/.gitkeep
+
+# --- Eval data (large public datasets — fetch on demand) ---------------------
+eval/dataset/
+eval-data/
+eval/tmp/
+
+# --- Test data privacy -------------------------------------------------------
+# Never commit any image fed to the eval harness.
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.gif
+*.avif
+# Exception: the icon files live under extension/icons/ and ARE checked in.
+!extension/icons/*.png

@@ -1,0 +1,13 @@
+# Place vendored onnxruntime-web assets here. See ../../scripts/fetch-model.sh.
+#
+# onnxruntime-web v1.27.0 ships only the *threaded* WASM variant in the npm
+# package: there's no plain ort-wasm.wasm anymore. The expected files are:
+#   1. ort.min.js                          (the JS shim, ~360KB)
+#   2. ort-wasm-simd-threaded.wasm         (the only WASM binary, ~13.5MB)
+#
+# numThreads is set to 1 in offscreen.js so we don't need SharedArrayBuffer /
+# COOP/COEP headers — the threaded binary's threading just falls back to
+# single-threaded mode at runtime. This keeps the extension self-contained
+# with no server-side configuration requirements.
+#
+# Update VERSION in scripts/fetch-model.sh to bump.

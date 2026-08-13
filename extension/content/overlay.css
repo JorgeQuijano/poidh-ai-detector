@@ -1,0 +1,25 @@
+/* extension/content/overlay.css
+   Overlay badge styles. Kept self-contained — no page CSS is mutated. */
+
+.poidh-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2147483646;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font: 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(2px);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+.poidh-pending { background: rgba(60, 60, 60, 0.6); }
+.poidh-ai      { background: rgba(220, 50, 47, 0.85); }
+.poidh-real    { background: rgba(40, 130, 80, 0.85); }
+.poidh-uncertain { background: rgba(120, 120, 120, 0.7); }

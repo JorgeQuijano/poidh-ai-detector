@@ -1,0 +1,7 @@
+# Public-domain eval images. Drop into dataset/{real,ai}/ subfolders.
+# Folder layout expected:
+#   eval/dataset/
+#     real/  <ground-truth: real images>
+#     ai/    <ground-truth: ai-generated images>
+# The harness reads both, scores each, and reports balanced accuracy at the
+# 65% confidence threshold.

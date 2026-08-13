@@ -1,0 +1,14 @@
+{
+  "name": "poidh-ai-detector",
+  "version": "0.1.0",
+  "description": "On-device AI image detector Chrome extension (poidh bounty #323).",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "fetch-model": "bash scripts/fetch-model.sh",
+    "check-size": "bash scripts/check-size.sh",
+    "icons": "bash scripts/generate-icons.sh",
+    "lint": "node scripts/lint.js"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,2 @@
+# Place ONNX int8 model files here. See ../../scripts/fetch-model.sh.
+# This file is .gitignored so the model artifacts do not enter git history.
