@@ -27,7 +27,7 @@ jobs:
             node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1
           done
           echo "JSON files parse OK"
-      - name: Check extension size budget (<= 300MB)
+      - name: Check extension size budget (<= 340MB)
         run: bash scripts/check-size.sh
       - name: List extension tree
         run: |

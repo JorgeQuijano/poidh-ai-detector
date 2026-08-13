@@ -11,11 +11,16 @@
 
 import { heuristicFilter } from '../extension/heuristics/heuristic-filter.js';
 
+// CLIP ViT-L/14 input contract (must match UniversalFakeDetect validate.py):
+//   1. shortest-side resize to 256
+//   2. center-crop 224x224
+//   3. CLIP normalization (NOT ImageNet)
 const MODEL_URL = '../extension/models/detector-int8-v0.1.0.onnx';
 const MODEL_VERSION = 'detector-int8-v0.1.0';
 const INPUT_SIZE = 224;
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
+const RESIZE_SIZE = 256;
+const MEAN = [0.48145466, 0.4578275, 0.40821073];
+const STD = [0.26862954, 0.26130258, 0.27577711];
 
 let session = null;
 
@@ -59,10 +64,21 @@ async function getSession() {
 }
 
 function bitmapToTensor(bitmap) {
-  const canvas = new OffscreenCanvas(INPUT_SIZE, INPUT_SIZE);
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(bitmap, 0, 0, INPUT_SIZE, INPUT_SIZE);
-  const { data } = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
+  // Step 1: shortest-side resize to RESIZE_SIZE.
+  const w0 = bitmap.width, h0 = bitmap.height;
+  const scale = RESIZE_SIZE / Math.min(w0, h0);
+  const w1 = Math.round(w0 * scale), h1 = Math.round(h0 * scale);
+  // Step 2: draw resized image, then center-crop INPUT_SIZE.
+  const tmp = new OffscreenCanvas(w1, h1);
+  const tctx = tmp.getContext('2d', { willReadFrequently: true });
+  tctx.drawImage(bitmap, 0, 0, w1, h1);
+  const offX = Math.floor((w1 - INPUT_SIZE) / 2);
+  const offY = Math.floor((h1 - INPUT_SIZE) / 2);
+  const cropped = new OffscreenCanvas(INPUT_SIZE, INPUT_SIZE);
+  const cctx = cropped.getContext('2d', { willReadFrequently: true });
+  cctx.drawImage(tmp, offX, offY, INPUT_SIZE, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE);
+  // Step 3: read pixels, normalize with CLIP stats, NCHW float32.
+  const { data } = cctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
   const float32Data = new Float32Array(3 * INPUT_SIZE * INPUT_SIZE);
   const pixelCount = INPUT_SIZE * INPUT_SIZE;
   for (let i = 0; i < pixelCount; i++) {
