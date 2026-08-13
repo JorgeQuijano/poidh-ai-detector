@@ -27,7 +27,15 @@ async function getSession() {
   if (!sessionPromise) {
     sessionPromise = (async () => {
       // Strip remote URLs / WebGPU / any attempt to phone home.
-      ort.env.wasm.wasmPaths = chrome.runtime.getURL('vendor/');
+      // The WASM loader needs explicit URLs for both the JS-side wrapper
+      // (.mjs) and the wasm binary. The default fallback would resolve
+      // against document.baseURI which lands in the wrong directory inside
+      // the offscreen document, so we pass both explicitly.
+      const base = chrome.runtime.getURL('vendor/');
+      ort.env.wasm.wasmPaths = {
+        mjs: new URL('ort-wasm-simd-threaded.jsep.mjs', base).href,
+        wasm: new URL('ort-wasm-simd-threaded.jsep.wasm', base).href,
+      };
       ort.env.wasm.numThreads = 1;
       ort.env.logLevel = 'warning';
 
