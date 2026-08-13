@@ -127,7 +127,12 @@
     if (!reply || !reply.ok) {
       badge.classList.remove(`${BADGE_PREFIX}pending`);
       badge.classList.add(`${BADGE_PREFIX}uncertain`);
-      badge.textContent = '?';
+      const reason = reply?.error || 'no-reply';
+      // Show a short hint in the badge so it's obvious which failure mode
+      // hit (heuristic crash, offscreen refused, model load error, etc.).
+      const short = reason.length > 18 ? reason.slice(0, 18) + '…' : reason;
+      badge.textContent = `? ${short}`;
+      badge.title = `poidh: scoring failed — ${reason}`;
       return;
     }
     renderBadge(badge, reply.result);
