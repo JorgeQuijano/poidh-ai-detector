@@ -10,11 +10,27 @@ Built for the [poidh bounty #323](https://poidh.xyz/arbitrum/bounty/323): *"loca
 |---|---|
 | Model | UnivFD CLIP ViT-L/14 + linear probe, int8 quantized (~292MB) |
 | Backbone | 427.6M params (CLIP ViT-L/14, frozen) |
-| Probe | 768→1 linear layer, exported as 2-class (real/fake) |
+| Probe | 768→2 linear layer (real/fake), exported as 2-class ONNX |
 | Total extension size | ~330MB (under 340MB CI ceiling) |
 | Inference backend | onnxruntime-web 1.27.0, WASM-only, no WebGPU |
 | Local eval result | **94.00% balanced accuracy** on frp94/progan_val (50/50 split) — **PASS** |
 | Honest caveat | The local eval is on a dataset *similar to* UnivFD's training distribution. The maintainer's private eval may be on different generators; cross-generator performance is unverified. |
+
+## One-command install
+
+```bash
+git clone https://github.com/JorgeQuijano/poidh-ai-detector.git
+cd poidh-ai-detector
+bash scripts/install.sh
+```
+
+Then load `extension/` as an unpacked extension in Chrome:
+
+```
+chrome://extensions/  →  Developer mode (top right)  →  Load unpacked  →  select extension/
+```
+
+That's it. The installer downloads the 207MB runtime bundle (model + WASM binaries) from the GitHub release — **no PyTorch, no 3GB dependencies, no build step**.
 
 ## How it works
 
@@ -49,65 +65,25 @@ poidh-ai-detector/
 │   ├── content/                         # MutationObserver + overlay badge
 │   ├── heuristics/heuristic-filter.js   # Plan 3 pre-filter
 │   ├── vendor/ort.min.js                # onnxruntime-web JS shim (committed)
-│   ├── vendor/ort-wasm-simd-threaded.*  # WASM binaries (gitignored, fetched)
-│   ├── models/                          # ONNX int8 model (gitignored, fetch)
-│   │   └── detector-int8-v0.1.0.onnx    # ~292MB UnivFD ViT-L/14 int8
+│   ├── vendor/ort-wasm-simd-threaded.*  # WASM binaries (downloaded by install.sh)
+│   ├── models/                          # ONNX int8 model (downloaded by install.sh)
+│   │   └── detector-int8-v0.1.0.onnx    # 292MB; SHA-256 3d986aed...f37d
 │   └── icons/
 ├── eval/                                # local regression test
 │   ├── index.html, runner.js            # the maintainer-style eval UI
 │   ├── preprocess.js                    # CLIP-correct preprocessing
 │   ├── onnxruntime-config.js            # pins WASM execution providers
 │   └── dataset/                         # gitignored eval images (real + AI)
-├── scripts/                             # fetch-model.sh, check-size.sh, lint
+├── scripts/                             # install / fetch-model / build-model / eval
+│   ├── install.sh                       # ONE-SHOT installer (downloads release assets)
+│   ├── fetch-model.sh                   # WASM-only fetcher (legacy)
+│   ├── build-model.py                   # PyTorch build (maintainers only)
+│   ├── local-eval.py                    # Python eval runner (no browser needed)
+│   └── lint.js, check-size.sh
 ├── .github/workflows/ci.yml
 ├── LICENSE
 └── README.md
 ```
-
-## Quick start (development)
-
-```bash
-git clone https://github.com/<owner>/poidh-ai-detector && cd poidh-ai-detector
-
-# 1. Fetch the onnxruntime-web WASM binaries (~40MB).
-bash scripts/fetch-model.sh
-
-# 2. Drop the UnivFD int8 model at extension/models/detector-int8-v0.1.0.onnx
-#    (~292MB). See "Building the model" below for export instructions.
-
-# 3. Load the extension unpacked in Chrome:
-#    chrome://extensions -> Developer mode -> "Load unpacked" -> select extension/
-# 4. Browse — small overlay appears on every detected image.
-# 5. Run the eval harness:
-bash scripts/eval-server.sh
-#    open http://127.0.0.1:8090/eval/ in Chrome
-#    pick eval/dataset/ as the input folder
-```
-
-## Building the model
-
-The shipped `detector-int8-v0.1.0.onnx` is UnivFD (CLIP ViT-L/14 + linear probe), int8 quantized. To rebuild it:
-
-```bash
-# 1. Clone UniversalFakeDetect
-git clone https://github.com/Yuheng-Li/UniversalFakeDetect
-
-# 2. Install pytorch CPU + onnx tooling
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install onnx onnxruntime onnxsim
-
-# 3. Export + quantize
-python3 scripts/build-model.py   # see scripts/build-model.py
-```
-
-The `scripts/build-model.py` script (in this repo) does:
-1. Load `CLIP:ViT-L/14` (853MB) from the `clip` package
-2. Load the linear probe from `pretrained_weights/fc_weights.pth` (3KB)
-3. Compose into a single `CLIPModel` module (768→2 linear)
-4. Export to ONNX fp32 (~1.2GB)
-5. Simplify with `onnxsim` (size unchanged, cleaner graph)
-6. Quantize weights to int8 (`onnxruntime.quantization.quantize_dynamic`)
-7. Result: ~292MB int8 ONNX
 
 ## Eval bar
 
@@ -121,11 +97,35 @@ Our local measurement:
 
 The maintainer will run their own private benchmark; the local eval is a *necessary* (not sufficient) signal. Cross-generator performance is the unknown.
 
+To reproduce the eval locally:
+
+```bash
+pip install -r requirements-eval.txt
+python3 scripts/local-eval.py
+# → 94.00% balanced accuracy, PASS
+```
+
+To populate `eval/dataset/`, see [`scripts/install.sh`](./scripts/install.sh) — it auto-fetches a balanced ProGAN val sample if you have the `datasets` Python package installed.
+
 ## Constraints
 
 - **WASM-only** — no WebGPU, no SharedArrayBuffer, no COOP/COEP. Runs on stock Chromium in a Docker-style eval environment.
 - **340MB ceiling** — `scripts/check-size.sh` enforces the total extension size in CI. UnivFD int8 + onnxruntime-web WASM = ~330MB. Override with `MAX_MB=...` if you need stricter.
 - **No remote calls** — `scripts/lint.js` scans shipped code for any HTTP URL and rejects it (privacy guarantee).
+
+## For maintainers (re-building the model)
+
+The shipped `detector-int8-v0.1.0.onnx` is built from UniversalFakeDetect (CLIP:ViT-L/14 + linear probe). To rebuild it from sources:
+
+```bash
+# Big install (~3GB): PyTorch CPU + ONNX + OpenAI CLIP
+pip install -r requirements-build.txt
+
+# Build the model (~10 minutes)
+python3 scripts/build-model.py
+```
+
+This is **not required** for users — the GitHub release already ships the pre-built model. The dependencies above are only for maintainers who want to rebuild or fine-tune.
 
 ## License
 
