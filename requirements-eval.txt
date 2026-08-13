@@ -1,0 +1,9 @@
+# Eval-only dependencies (run scripts/local-eval.py to score a downloaded
+# eval set). Smaller than requirements-build.txt — no PyTorch, no CLIP.
+#
+# Install with:
+#     pip install -r requirements-eval.txt
+
+numpy
+onnxruntime
+Pillow

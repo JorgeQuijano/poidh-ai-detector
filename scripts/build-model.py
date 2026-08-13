@@ -23,10 +23,24 @@ import os
 import sys
 import time
 
-# 1. Load model
-import torch
-import torch.nn as nn
-import clip   # openai-clip
+try:
+    import torch
+    import torch.nn as nn
+    import clip  # openai-clip
+except ImportError as e:
+    print(
+        "!! missing dependency:",
+        e.name,
+        "\n",
+        "Install with:\n",
+        "    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu\n",
+        "    pip install onnx onnxruntime onnxsim ftfy regex\n",
+        "\n",
+        "(note: clip is the openai-clip package, not the openai CLI)",
+        sep="",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 CHANNELS = {"RN50": 1024, "ViT-L/14": 768}
 

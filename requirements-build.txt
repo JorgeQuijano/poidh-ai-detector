@@ -1,0 +1,21 @@
+# Build dependencies for scripts/build-model.py:
+#     pip install -r requirements-build.txt
+#
+# This is the BIG install (~3GB). PyTorch + CLIP ViT-L/14 weights dominate.
+# For just running the eval (no re-training), see requirements-eval.txt.
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch
+torchvision
+onnx
+onnxruntime
+onnxsim
+Pillow
+numpy
+ftfy
+regex
+
+# OpenAI CLIP (the python package, not the openai CLI).
+# Source: https://github.com/openai/CLIP
+git+https://github.com/openai/CLIP.git
