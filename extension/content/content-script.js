@@ -105,8 +105,31 @@
   function renderBadge(badge, result) {
     badge.classList.remove(`${BADGE_PREFIX}pending`, `${BADGE_PREFIX}ai`, `${BADGE_PREFIX}real`, `${BADGE_PREFIX}uncertain`);
     badge.classList.add(`${BADGE_PREFIX}${result.label}`);
-    badge.textContent = `${result.label} ${Math.round(result.confidence * 100)}%`;
-    badge.title = `tier=${result.tier} • ${result.reason || ''}`;
+
+    // If the service worker is reporting an uncertain verdict because the
+    // neural tier failed (offscreen doc error, model load error, etc.), the
+    // confidence is meaningless 0.0 — show the failure reason in the badge
+    // body so the user can debug. Otherwise show label + confidence as usual.
+    const isNeuralFailure =
+      result.label === 'uncertain' &&
+      result.tier === 'heuristic' &&
+      typeof result.reason === 'string' &&
+      result.reason.startsWith('neural-failed');
+
+    if (isNeuralFailure) {
+      const reason = result.reason.replace(/^neural-failed:\s*/, '');
+      const short = reason.length > 22 ? reason.slice(0, 22) + '…' : reason;
+      badge.textContent = `! ${short}`;
+      badge.title = `poidh: neural inference failed — ${reason}`;
+    } else if (result.label === 'uncertain' && (result.confidence ?? 0) < 0.001) {
+      // Heuristic-only verdict with no positive evidence. Not a failure,
+      // just "I don't know without the model" — keep the visual neutral.
+      badge.textContent = `${result.label} —`;
+      badge.title = `poidh: ${result.reason || 'no positive AI metadata'} — model would decide`;
+    } else {
+      badge.textContent = `${result.label} ${Math.round(result.confidence * 100)}%`;
+      badge.title = `tier=${result.tier} • ${result.reason || ''}`;
+    }
   }
 
   function removeAllBadges() {

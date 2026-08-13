@@ -1,10 +1,13 @@
 // extension/offscreen/offscreen.js
 //
 // Runs inside the off-screen document. Loads the ONNX model (WASM-only — no
-// WebGPU) and exposes a single message: 'OFFSCREEN_SCORE' -> { ai_probability }.
+// WebGPU) and exposes a single port 'poidh-offscreen' that accepts
+// { requestId, image } and replies with { requestId, ok, result } or
+// { requestId, ok: false, error }.
 //
 // Model is fetched from the extension's own package (chrome.runtime.getURL)
-// and cached by the browser. We pin to WASM ep for worst-case Chrome compatibility.
+// and cached by the browser. We pin to WASM ep for worst-case Chromium
+// compatibility.
 
 const MODEL_URL = chrome.runtime.getURL('models/detector-int8-v0.1.0.onnx');
 const MODEL_VERSION = 'detector-int8-v0.1.0';
@@ -91,12 +94,18 @@ async function scoreImage(image) {
   return { ai_probability, model_version: MODEL_VERSION };
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'OFFSCREEN_SCORE') {
-    scoreImage(msg.image)
-      .then((result) => sendResponse({ ok: true, result }))
-      .catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
-    return true;
-  }
-  return false;
+// Listen on the dedicated port 'poidh-offscreen'. The service worker
+// connects via chrome.runtime.connect({ name: 'poidh-offscreen' }).
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'poidh-offscreen') return;
+  port.onMessage.addListener(async (msg) => {
+    const { requestId, image } = msg || {};
+    if (!requestId) return;
+    try {
+      const result = await scoreImage(image);
+      port.postMessage({ requestId, ok: true, result });
+    } catch (err) {
+      port.postMessage({ requestId, ok: false, error: String(err && err.message || err) });
+    }
+  });
 });

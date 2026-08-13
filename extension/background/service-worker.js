@@ -25,7 +25,7 @@ async function ensureOffscreen() {
     contextTypes: ['OFFSCREEN_DOCUMENT'],
     documentUrls: [OFFSCREEN_URL],
   });
-  if (existing.length > 0) return;
+  if (existing.length > 0) return existing[0].documentId || true;
 
   await chrome.offscreen.createDocument({
     url: OFFSCREEN_URL,
@@ -34,9 +34,56 @@ async function ensureOffscreen() {
       'Run onnxruntime-web WASM inference for AI image detection. ' +
       'All processing stays on-device; no image data is sent off the machine.',
   });
+  return true;
 }
 
-// -- Message routing ---------------------------------------------------------
+// -- Offscreen communication via a long-lived port -------------------------
+// We use a dedicated port (not chrome.runtime.sendMessage) so the message
+// is delivered to the offscreen document specifically, not echoed back to
+// the service worker itself.
+
+let offscreenPort = null;
+let offscreenReadyPromise = null;
+
+async function getOffscreenPort() {
+  if (offscreenPort) return offscreenPort;
+  if (offscreenReadyPromise) return offscreenReadyPromise;
+
+  offscreenReadyPromise = (async () => {
+    await ensureOffscreen();
+    const port = chrome.runtime.connect({ name: 'poidh-offscreen' });
+    // offscreen.js registers a port listener named 'poidh-offscreen'.
+    offscreenPort = port;
+    port.onDisconnect.addListener(() => {
+      offscreenPort = null;
+      offscreenReadyPromise = null;
+    });
+    return port;
+  })();
+  return offscreenReadyPromise;
+}
+
+function scoreViaOffscreen(image) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const port = await getOffscreenPort();
+      const requestId = Math.random().toString(36).slice(2);
+      const listener = (msg) => {
+        if (msg && msg.requestId === requestId) {
+          port.onMessage.removeListener(listener);
+          if (msg.ok) resolve(msg.result);
+          else reject(new Error(msg.error || 'offscreen-failed'));
+        }
+      };
+      port.onMessage.addListener(listener);
+      port.postMessage({ requestId, image });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// -- Message routing --------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'PING') {
@@ -48,7 +95,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // msg.image: { bitmap: ImageBitmap, src: string, width, height, mime, bytes? }
     handleScore(msg.image)
       .then((result) => sendResponse({ ok: true, result }))
-      .catch((err) => sendResponse({ ok: false, error: String(err) }));
+      .catch((err) => sendResponse({ ok: false, error: String(err && err.message || err) }));
     return true; // keep channel open for async response
   }
 
@@ -68,29 +115,25 @@ async function handleScore(image) {
   }
 
   // Tier 2: neural inference via the offscreen document
-  await ensureOffscreen();
-  const neural = await chrome.runtime.sendMessage({
-    type: 'OFFSCREEN_SCORE',
-    image,
-  });
-
-  if (!neural?.ok) {
+  try {
+    const neural = await scoreViaOffscreen(image);
+    const { ai_probability, model_version } = neural;
+    const label = ai_probability >= CONFIDENCE_THRESHOLD ? 'ai' : 'real';
+    return {
+      label,
+      confidence: ai_probability,
+      tier: 'neural',
+      reason: `model=${model_version}`,
+    };
+  } catch (err) {
+    // Offscreen failed: surface the error so the badge can show it.
     return {
       label: 'uncertain',
       confidence: heuristic.confidence,
       tier: 'heuristic',
-      reason: `neural-unavailable: ${neural?.error || 'unknown'}`,
+      reason: `neural-failed: ${err.message || err}`,
     };
   }
-
-  const { ai_probability, model_version } = neural.result;
-  const label = ai_probability >= CONFIDENCE_THRESHOLD ? 'ai' : 'real';
-  return {
-    label,
-    confidence: ai_probability,
-    tier: 'neural',
-    reason: `model=${model_version}`,
-  };
 }
 
 // -- Install / startup --------------------------------------------------------
