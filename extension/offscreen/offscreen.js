@@ -105,6 +105,7 @@ chrome.runtime.onConnect.addListener((port) => {
       const result = await scoreImage(image);
       port.postMessage({ requestId, ok: true, result });
     } catch (err) {
+      console.error('[poidh offscreen] scoreImage failed:', err);
       port.postMessage({ requestId, ok: false, error: String(err && err.message || err) });
     }
   });

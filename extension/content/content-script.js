@@ -118,7 +118,9 @@
 
     if (isNeuralFailure) {
       const reason = result.reason.replace(/^neural-failed:\s*/, '');
-      const short = reason.length > 22 ? reason.slice(0, 22) + '…' : reason;
+      // Log full reason to console; show a truncated version in the badge.
+      console.error('[poidh] neural inference failed:', reason);
+      const short = reason.length > 32 ? reason.slice(0, 32) + '…' : reason;
       badge.textContent = `! ${short}`;
       badge.title = `poidh: neural inference failed — ${reason}`;
     } else if (result.label === 'uncertain' && (result.confidence ?? 0) < 0.001) {
