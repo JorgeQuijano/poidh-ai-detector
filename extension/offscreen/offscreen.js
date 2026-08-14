@@ -48,8 +48,8 @@ async function decodeBitmap(image) {
     }
   }
   // Diagnostic: surface what we actually got so the next bug is debuggable.
-  const magic = Array.from(new Uint8Array(image.bytes, 0, Math.min(8, image.bytes.byteLength)))
-    .map(b => b.toString(16).padStart(2, '0')).join(' ');
+  const u8 = new Uint8Array(image.bytes, 0, Math.min(8, image.bytes.byteLength));
+  const magic = Array.from(u8).map(b => b.toString(16).padStart(2, '0')).join(' ');
   console.error(
     '[poidh offscreen] decode failed',
     { src: image.src, mime: image.mime, size: image.bytes.byteLength, magic }
@@ -66,7 +66,7 @@ async function decodeBitmap(image) {
       magic,
     });
   } catch {}
-  throw new Error(`decode failed [magic=${magic} src=${image.src}]`);
+  throw new Error(`decode failed [magic=${magic} size=${image.bytes.byteLength} mime=${image.mime} src=${image.src}]`);
 }
 
 async function getSession() {
