@@ -68,14 +68,32 @@
     // Prefer the server-provided Content-Type. Fall back to inferring from
     // the URL extension so createImageBitmap can pick the right decoder.
     const mime = blob.type || guessMime(src);
+    // Encode as base64 string. ArrayBuffer transfer across chrome.runtime
+    // boundaries (content -> worker, worker -> offscreen via port) has been
+    // observed to silently degrade to a plain object {0: ..., 1: ...} on
+    // some Chromium builds, breaking image.bytes.byteLength downstream.
+    // Base64 is structured-clone safe and survives any boundary.
+    const bytes_b64 = arrayBufferToBase64(buf);
     return chrome.runtime.sendMessage({
       type: 'SCORE_IMAGE',
       image: {
-        bytes: buf,
+        bytes_b64,
         mime,
         src,
       },
     });
+  }
+
+  // Convert an ArrayBuffer to a base64 string using chunked operations so
+  // we don't blow up on large images (Wikipedia thumbs can be ~10MB).
+  function arrayBufferToBase64(buf) {
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
   }
 
   // Map .png/.jpg/.gif/.webp/.svg URLs to a MIME type so we have something

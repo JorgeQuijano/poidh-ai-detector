@@ -31,11 +31,23 @@ const CONFIDENT_THIRD_PARTY = 0.85;
 
 export async function heuristicFilter(image) {
   // No bytes available? Bail (low confidence, force neural).
-  if (!image.bytes || image.bytes.byteLength === 0) {
+  // Bytes may arrive as raw bytes (legacy), base64 (new), or neither.
+  let bytesView;
+  if (image.bytes_b64) {
+    const bin = atob(image.bytes_b64);
+    const ab = new ArrayBuffer(bin.length);
+    bytesView = new Uint8Array(ab);
+    for (let i = 0; i < bin.length; i++) bytesView[i] = bin.charCodeAt(i);
+  } else if (image.bytes && typeof image.bytes.byteLength === 'number') {
+    bytesView = new Uint8Array(image.bytes);
+  } else if (image.bytes && typeof image.bytes.length === 'number') {
+    bytesView = new Uint8Array(image.bytes);
+  }
+  if (!bytesView || bytesView.length === 0) {
     return { label: 'uncertain', confidence: 0.0, reason: 'no-bytes' };
   }
 
-  const bytes = new Uint8Array(image.bytes);
+  const bytes = bytesView;
   const mime = (image.mime || '').toLowerCase();
 
   // 1. C2PA — JUMBF box in JPEG starts with bytes 0x00000011 'jumb' ...

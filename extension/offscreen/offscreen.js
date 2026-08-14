@@ -24,20 +24,42 @@ const STD = [0.26862954, 0.26130258, 0.27577711];
 let sessionPromise = null;
 
 // Decode image bytes into a fresh ImageBitmap. Handles the case where the
-// caller already provided an ImageBitmap (skip decode) or only bytes.
+// caller already provided an ImageBitmap (skip decode) or base64 bytes.
 async function decodeBitmap(image) {
   if (image.bitmap && typeof image.bitmap.width === 'number' && image.bitmap.width > 0) {
     return image.bitmap;
   }
-  if (!image.bytes) {
-    throw new Error('image has neither bitmap nor bytes');
+  // Normalize to ArrayBuffer. Older callers may have sent raw bytes
+  // (ArrayBuffer / Uint8Array) directly; newer callers send base64 to
+  // survive the chrome.runtime structured-clone boundary reliably.
+  let ab = null;
+  if (image.bytes_b64) {
+    const bin = atob(image.bytes_b64);
+    ab = new ArrayBuffer(bin.length);
+    const view = new Uint8Array(ab);
+    for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+  } else if (image.bytes && typeof image.bytes.byteLength === 'number') {
+    ab = image.bytes;
+  } else if (image.bytes && typeof image.bytes.length === 'number') {
+    // Sometimes Uint8Array round-trips as {0:,1:,2:,...} — coerce.
+    ab = new ArrayBuffer(image.bytes.length);
+    new Uint8Array(ab).set(image.bytes);
+  }
+  if (!ab || ab.byteLength === 0) {
+    console.error('[poidh offscreen] decode failed: empty/no bytes', {
+      src: image.src, mime: image.mime,
+      keys: Object.keys(image || {}),
+      bytesType: typeof image.bytes,
+      bytes_b64Len: image.bytes_b64?.length,
+    });
+    throw new Error(`decode failed: empty bytes (keys: ${Object.keys(image || {}).join(',')})`);
   }
   // Try with the provided MIME first; fall back to sniffing (no type) so
   // createImageBitmap reads the magic bytes. This handles servers that
   // omit Content-Type or send the wrong one.
   const tryDecoders = [
-    () => createImageBitmap(new Blob([image.bytes], { type: image.mime || 'application/octet-stream' })),
-    () => createImageBitmap(new Blob([image.bytes])), // sniff
+    () => createImageBitmap(new Blob([ab], { type: image.mime || 'application/octet-stream' })),
+    () => createImageBitmap(new Blob([ab])), // sniff
   ];
   let lastErr;
   for (const fn of tryDecoders) {
@@ -48,25 +70,13 @@ async function decodeBitmap(image) {
     }
   }
   // Diagnostic: surface what we actually got so the next bug is debuggable.
-  const u8 = new Uint8Array(image.bytes, 0, Math.min(8, image.bytes.byteLength));
+  const u8 = new Uint8Array(ab, 0, Math.min(8, ab.byteLength));
   const magic = Array.from(u8).map(b => b.toString(16).padStart(2, '0')).join(' ');
   console.error(
     '[poidh offscreen] decode failed',
-    { src: image.src, mime: image.mime, size: image.bytes.byteLength, magic }
+    { src: image.src, mime: image.mime, size: ab.byteLength, magic }
   );
-  // Also send to the service worker so it shows up in the SW devtools,
-  // which is the only console most users open.
-  try {
-    chrome.runtime.sendMessage({
-      type: 'POIDH_DIAG',
-      tag: 'decode-failed',
-      src: image.src,
-      mime: image.mime,
-      size: image.bytes.byteLength,
-      magic,
-    });
-  } catch {}
-  throw new Error(`decode failed [magic=${magic} size=${image.bytes.byteLength} mime=${image.mime} src=${image.src}]`);
+  throw new Error(`decode failed [magic=${magic} size=${ab.byteLength} mime=${image.mime} src=${image.src}]`);
 }
 
 async function getSession() {

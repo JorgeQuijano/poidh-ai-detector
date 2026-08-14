@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>poidh-debug</title>
+</head>
+<body>
+<h1>poidh debug page</h1>
+<pre id="out"></pre>
+<script>
+async function test() {
+  const out = document.getElementById('out');
+  const lines = [];
+  const log = (s) => { lines.push(s); out.textContent = lines.join('\n'); };
+
+  // 1. Try to fetch a real Wikimedia JPEG
+  const url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/The_Building_Worker_statue.jpg/250px-The_Building_Worker_statue.jpg';
+  log('Fetching: ' + url);
+  try {
+    const resp = await fetch(url, { credentials: 'omit', cache: 'force-cache' });
+    log('  resp.ok=' + resp.ok + ' status=' + resp.status);
+    log('  Content-Type=' + resp.headers.get('Content-Type'));
+    const blob = await resp.blob();
+    log('  blob.size=' + blob.size + ' blob.type=' + blob.type);
+    const buf = await blob.arrayBuffer();
+    log('  arrayBuffer.byteLength=' + buf.byteLength);
+    log('  first 8 bytes: ' + Array.from(new Uint8Array(buf, 0, 8)).map(b => b.toString(16).padStart(2,'0')).join(' '));
+
+    // 2. Try sendMessage with bytes
+    log('\nNow testing chrome.runtime.sendMessage with bytes...');
+    try {
+      const reply = await chrome.runtime.sendMessage({
+        type: 'POIDH_TEST',
+        image: { bytes: buf, mime: blob.type, src: url }
+      });
+      log('  sendMessage reply: ' + JSON.stringify(reply));
+    } catch (err) {
+      log('  sendMessage ERROR: ' + err.message);
+    }
+  } catch (err) {
+    log('FETCH ERROR: ' + err.message);
+  }
+
+  // 3. Test createImageBitmap directly
+  log('\nTesting createImageBitmap...');
+  try {
+    const resp = await fetch('https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/The_Building_Worker_statue.jpg/250px-The_Building_Worker_statue.jpg');
+    const blob = await resp.blob();
+    const bitmap = await createImageBitmap(blob);
+    log('  bitmap.width=' + bitmap.width + ' bitmap.height=' + bitmap.height);
+  } catch (err) {
+    log('  createImageBitmap ERROR: ' + err.message);
+  }
+}
+test();
+</script>
+</body>
+</html>
