@@ -131,9 +131,15 @@ async function handleScore(image) {
     const neural = await scoreViaOffscreen(image);
     const { ai_probability, model_version } = neural;
     const label = ai_probability >= CONFIDENCE_THRESHOLD ? 'ai' : 'real';
+    // Report confidence IN THE PREDICTED LABEL, not the raw AI probability:
+    //   ai_probability 0.98 -> label 'ai'   -> confidence 0.98
+    //   ai_probability 0.02 -> label 'real' -> confidence 0.98
+    // Otherwise a "real" verdict would display as "real 2%" — reads like
+    // we're 2% confident it's real when we're actually 98% confident.
+    const confidence = label === 'ai' ? ai_probability : 1 - ai_probability;
     return {
       label,
-      confidence: ai_probability,
+      confidence,
       tier: 'neural',
       reason: `model=${model_version}`,
     };
