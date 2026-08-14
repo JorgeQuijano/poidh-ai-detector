@@ -64,22 +64,33 @@
     const blob = await resp.blob();
     if (blob.size < 1024) return null; // tiny placeholder / icon
 
-    let bitmap;
-    try {
-      bitmap = await createImageBitmap(blob);
-    } catch {
-      return null;
-    }
-
     const buf = await blob.arrayBuffer();
+    // Prefer the server-provided Content-Type. Fall back to inferring from
+    // the URL extension so createImageBitmap can pick the right decoder.
+    const mime = blob.type || guessMime(src);
     return chrome.runtime.sendMessage({
       type: 'SCORE_IMAGE',
       image: {
-        bytes: buf,           // ArrayBuffer — structured-clone safe
-        mime: blob.type,
+        bytes: buf,
+        mime,
         src,
       },
     });
+  }
+
+  // Map .png/.jpg/.gif/.webp/.svg URLs to a MIME type so we have something
+  // for createImageBitmap to work with when the server omits Content-Type
+  // (common on small CDN thumbnails and lazy-loaded images).
+  function guessMime(url) {
+    const u = url.split('?')[0].split('#')[0].toLowerCase();
+    if (u.endsWith('.png'))  return 'image/png';
+    if (u.endsWith('.jpg') || u.endsWith('.jpeg')) return 'image/jpeg';
+    if (u.endsWith('.gif'))  return 'image/gif';
+    if (u.endsWith('.webp')) return 'image/webp';
+    if (u.endsWith('.avif')) return 'image/avif';
+    if (u.endsWith('.bmp'))  return 'image/bmp';
+    if (u.endsWith('.ico'))  return 'image/x-icon';
+    return ''; // unknown — let createImageBitmap sniff
   }
 
   // -- Overlay badge --------------------------------------------------------

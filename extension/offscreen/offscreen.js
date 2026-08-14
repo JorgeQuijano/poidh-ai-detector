@@ -32,8 +32,22 @@ async function decodeBitmap(image) {
   if (!image.bytes) {
     throw new Error('image has neither bitmap nor bytes');
   }
-  const blob = new Blob([image.bytes], { type: image.mime || 'application/octet-stream' });
-  return await createImageBitmap(blob);
+  // Try with the provided MIME first; fall back to sniffing (no type) so
+  // createImageBitmap reads the magic bytes. This handles servers that
+  // omit Content-Type or send the wrong one.
+  const tryDecoders = [
+    () => createImageBitmap(new Blob([image.bytes], { type: image.mime || 'application/octet-stream' })),
+    () => createImageBitmap(new Blob([image.bytes])), // sniff
+  ];
+  let lastErr;
+  for (const fn of tryDecoders) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw new Error(`decode failed: ${lastErr?.message || lastErr}`);
 }
 
 async function getSession() {
