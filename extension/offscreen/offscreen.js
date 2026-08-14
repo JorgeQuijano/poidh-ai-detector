@@ -23,6 +23,19 @@ const STD = [0.26862954, 0.26130258, 0.27577711];
 
 let sessionPromise = null;
 
+// Decode image bytes into a fresh ImageBitmap. Handles the case where the
+// caller already provided an ImageBitmap (skip decode) or only bytes.
+async function decodeBitmap(image) {
+  if (image.bitmap && typeof image.bitmap.width === 'number' && image.bitmap.width > 0) {
+    return image.bitmap;
+  }
+  if (!image.bytes) {
+    throw new Error('image has neither bitmap nor bytes');
+  }
+  const blob = new Blob([image.bytes], { type: image.mime || 'application/octet-stream' });
+  return await createImageBitmap(blob);
+}
+
 async function getSession() {
   if (!sessionPromise) {
     sessionPromise = (async () => {
@@ -88,7 +101,11 @@ function bitmapToTensor(bitmap) {
 
 async function scoreImage(image) {
   const session = await getSession();
-  const tensor = bitmapToTensor(image.bitmap);
+  // Decode the bytes into a fresh ImageBitmap here. The content script
+  // sends only ArrayBuffer (ImageBitmap doesn't survive structured
+  // cloning across port.postMessage in some Chromium builds).
+  const bitmap = await decodeBitmap(image);
+  const tensor = bitmapToTensor(bitmap);
   const feeds = { [session.inputNames[0]]: tensor };
   const out = await session.run(feeds);
 

@@ -75,12 +75,9 @@
     return chrome.runtime.sendMessage({
       type: 'SCORE_IMAGE',
       image: {
-        bitmap,
-        bytes: buf,
+        bytes: buf,           // ArrayBuffer — structured-clone safe
         mime: blob.type,
         src,
-        width: bitmap.width,
-        height: bitmap.height,
       },
     });
   }

@@ -103,7 +103,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 async function handleScore(image) {
-  // Tier 1: heuristic pre-filter (cheap, no model load needed)
+  // The content script sends only bytes (ArrayBuffer). ImageBitmap doesn't
+  // survive structured cloning reliably across port.postMessage in some
+  // Chromium builds, so we decode to a fresh ImageBitmap in the offscreen
+  // document instead. The worker just forwards bytes.
+
+  // Tier 1: heuristic pre-filter (cheap, no model load needed, works on bytes)
   const heuristic = await heuristicFilter(image);
   if (heuristic.confidence >= CONFIDENCE_THRESHOLD) {
     return {
