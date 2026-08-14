@@ -52,6 +52,9 @@
   async function scoreImage(img) {
     const src = bestSrc(img);
     if (!src || src.startsWith('data:')) return null; // skip inline (too small)
+    // Skip SVG — createImageBitmap can't decode SVG, and the model isn't
+    // trained on vector graphics anyway.
+    if (src.toLowerCase().includes('.svg')) return null;
 
     let resp;
     try {

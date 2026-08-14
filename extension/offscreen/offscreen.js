@@ -156,16 +156,17 @@ async function scoreImage(image) {
   // softmax probability of the "fake" class.
   const outTensor = out[session.outputNames[0]];
   let ai_probability;
-  if (outTensor.dims.length === 1 && outTensor.dims[0] === 1) {
-    ai_probability = outTensor.data[0];
-  } else if (outTensor.dims.length === 1 && outTensor.dims[0] === 2) {
+  // Output shape is [batch=1, classes=2] — dims=[1,2], data.length=2
+  if (outTensor.data.length === 2) {
     const [a, b] = outTensor.data;
     const max = Math.max(a, b);
     const expA = Math.exp(a - max);
     const expB = Math.exp(b - max);
     ai_probability = expB / (expA + expB); // index 1 = "fake"
+  } else if (outTensor.data.length === 1) {
+    ai_probability = outTensor.data[0];
   } else {
-    throw new Error(`unexpected model output shape: ${outTensor.dims}`);
+    throw new Error(`unexpected model output shape: [${outTensor.dims}], data.length=${outTensor.data.length}`);
   }
   return { ai_probability, model_version: MODEL_VERSION };
 }
