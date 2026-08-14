@@ -91,6 +91,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return false;
   }
 
+  if (msg?.type === 'POIDH_DIAG') {
+    // The offscreen doc doesn't have a devtools window users typically open,
+    // so diagnostics are routed here and printed in the service worker console.
+    console.warn('[poidh diag]', msg.tag, msg);
+    return false;
+  }
+
   if (msg?.type === 'SCORE_IMAGE') {
     // msg.image: { bitmap: ImageBitmap, src: string, width, height, mime, bytes? }
     handleScore(msg.image)

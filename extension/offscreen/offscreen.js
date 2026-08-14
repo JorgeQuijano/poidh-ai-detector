@@ -54,6 +54,18 @@ async function decodeBitmap(image) {
     '[poidh offscreen] decode failed',
     { src: image.src, mime: image.mime, size: image.bytes.byteLength, magic }
   );
+  // Also send to the service worker so it shows up in the SW devtools,
+  // which is the only console most users open.
+  try {
+    chrome.runtime.sendMessage({
+      type: 'POIDH_DIAG',
+      tag: 'decode-failed',
+      src: image.src,
+      mime: image.mime,
+      size: image.bytes.byteLength,
+      magic,
+    });
+  } catch {}
   throw new Error(`decode failed: ${lastErr?.message || lastErr}`);
 }
 
