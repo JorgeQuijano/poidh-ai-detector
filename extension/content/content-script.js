@@ -59,7 +59,10 @@
   // -- Inference ------------------------------------------------------------
   async function scoreImage(img) {
     const src = bestSrc(img);
-    if (!src || src.startsWith('data:')) return null; // skip inline (too small)
+    if (!src) return null;
+    // data: URLs are fine — fetch() decodes them locally (no network),
+    // which matters for offline eval harnesses that embed benchmark
+    // images inline. blob: URLs likewise work without CORS issues.
     // Skip SVG — createImageBitmap can't decode SVG, and the model isn't
     // trained on vector graphics anyway.
     if (src.toLowerCase().includes('.svg')) return null;
@@ -182,7 +185,7 @@
   //   - a 20x20 source file is noise even if CSS stretches it to 400px
   function shouldScore(img) {
     const src = bestSrc(img);
-    if (!src || src.startsWith('data:')) return false;   // inline data
+    if (!src) return false; // no source at all
     if (src.toLowerCase().includes('.svg')) return false; // vector, not decodable
 
     // Rendered size. 0 when hidden or not laid out yet — in that case fall
