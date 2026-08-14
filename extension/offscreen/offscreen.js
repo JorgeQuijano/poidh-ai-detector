@@ -66,7 +66,7 @@ async function decodeBitmap(image) {
       magic,
     });
   } catch {}
-  throw new Error(`decode failed: ${lastErr?.message || lastErr}`);
+  throw new Error(`decode failed [magic=${magic} src=${image.src}]`);
 }
 
 async function getSession() {
