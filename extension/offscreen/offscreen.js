@@ -47,6 +47,13 @@ async function decodeBitmap(image) {
       lastErr = err;
     }
   }
+  // Diagnostic: surface what we actually got so the next bug is debuggable.
+  const magic = Array.from(new Uint8Array(image.bytes, 0, Math.min(8, image.bytes.byteLength)))
+    .map(b => b.toString(16).padStart(2, '0')).join(' ');
+  console.error(
+    '[poidh offscreen] decode failed',
+    { src: image.src, mime: image.mime, size: image.bytes.byteLength, magic }
+  );
   throw new Error(`decode failed: ${lastErr?.message || lastErr}`);
 }
 
