@@ -14,6 +14,14 @@
   let enabled = true;
   let observer = null;
 
+  // Only score images that are plausibly "content". Icons, favicons,
+  // avatars, buttons, sprites, and lazy-loaded thumbnails are skipped to
+  // avoid badge noise. Tune freely:
+  //   MIN_DISPLAY_PX  — rendered size on the page (both dimensions)
+  //   MIN_INTRINSIC_PX — source file resolution (both dimensions)
+  const MIN_DISPLAY_PX = 96;
+  const MIN_INTRINSIC_PX = 128;
+
   // -- Config sync with popup ------------------------------------------------
   chrome.storage?.local?.get({ enabled: true }, (cfg) => {
     enabled = cfg.enabled !== false;
@@ -168,10 +176,37 @@
   }
 
   // -- Per-image processing -------------------------------------------------
+  // Decide whether an image is worth scoring. We gate on BOTH the size it's
+  // rendered at on the page (display px) and its intrinsic resolution:
+  //   - an icon rendered at 24px is noise even if the source file is 512px
+  //   - a 20x20 source file is noise even if CSS stretches it to 400px
+  function shouldScore(img) {
+    const src = bestSrc(img);
+    if (!src || src.startsWith('data:')) return false;   // inline data
+    if (src.toLowerCase().includes('.svg')) return false; // vector, not decodable
+
+    // Rendered size. 0 when hidden or not laid out yet — in that case fall
+    // through to the intrinsic check below.
+    const rect = img.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      if (rect.width < MIN_DISPLAY_PX || rect.height < MIN_DISPLAY_PX) return false;
+    } else if (img.clientWidth > 0 && img.clientHeight > 0) {
+      if (img.clientWidth < MIN_DISPLAY_PX || img.clientHeight < MIN_DISPLAY_PX) return false;
+    }
+
+    // Intrinsic resolution. 0 means not loaded / broken — skip those too.
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      if (img.naturalWidth < MIN_INTRINSIC_PX || img.naturalHeight < MIN_INTRINSIC_PX) return false;
+    } else {
+      return false;
+    }
+    return true;
+  }
+
   async function processImg(img) {
     if (processed.has(img)) return;
     if (!img.isConnected) return;
-    if (img.naturalWidth < 64 || img.naturalHeight < 64) return; // skip icons
+    if (!shouldScore(img)) return; // skip icons / small / broken
     processed.add(img);
 
     const badge = ensureBadgeContainer(img);
